@@ -1,0 +1,103 @@
+import requests
+import json
+
+
+class DatabricksParallelJobsLaunch:
+    """
+    This class contains methods to create and submit parallel jobs of a given Databricks notebook onto a Databricks cluster.
+
+    :param notebook_path: This is the path to the Databricks notebook you want to run in parallel
+    :param databricks_token: This is the databricks token to authenticate into the Databricks workspace
+    :param databricks_instance: This is the databricks instance id
+    :param databricks_cluster_id: This is the cluster id of the databricks cluster which will run the jobs
+    :param databricks_instance_id: This is the databricks workspace instance id
+    :param num_of_parallel_instances: The number of desired parallel runs
+    """
+
+    def __init__(self, databricks_instance: str, databricks_token: str, databricks_instance_id: str,
+                 databricks_cluster_id: str, notebook_path: str, num_of_parallel_instances: int):
+
+        """
+        Class initiation method
+        """
+
+        self.notebook_path = notebook_path
+        self.databricks_token = databricks_token
+        self.databricks_instance = databricks_instance
+        self.databricks_cluster_id = databricks_cluster_id
+        self.databricks_instance_id = databricks_instance_id
+        self.num_of_parallel_instances = num_of_parallel_instances
+
+    def __str__(self) -> str:
+
+        """
+        Dunder method for an end user-friendly string of the class object description
+        """
+
+        return f"DatabricksParallelJobsLaunch: notebook_path:{self.notebook_path}, databricks_token: {self.databricks_token}, databricks_instance: {self.databricks_instance}, databricks_cluster_id: {self.databricks_cluster_id}, databricks_instance_id: {self.databricks_instance_id}, number_of_parallel_instances: {self.num_of_parallel_instances}"
+
+    def __repr__(self) -> str:
+
+        """
+        Dunder method for a programmer-friendly description of the class objec
+        """
+
+        class_name = type().__name__
+
+        return f"{class_name}, notebook_path:{self.notebook_path}, databricks_token: {self.databricks_token}, databricks_instance: {self.databricks_instance}, databricks_cluster_id: {self.databricks_cluster_id}, databricks_instance_id: {self.databricks_instance_id}, number_of_parallel_instances: {self.num_of_parallel_instances}"
+
+    def __create_jobs_run(self):
+
+        """
+        This method creates the job request to be sent to the API. This is a private method thus not meant to be exposed outside the class. Private methods are named with a preceding "__" in the same manner as Dunder methods.
+
+        Return: Response data from the API call
+        """
+
+        url = f"{self.databricks_instance}/api/2.1/jobs/runs/submit"
+        headers = {"Authorization": f"Bearer {self.databricks_token}"}
+        data = {
+            "run_name": f"KafkaConsumer-{self.databricks_instance_id}",
+            "existing_cluster_id": self.databricks_cluster_id,
+            "notebook_task": {
+                "notebook_path": self.notebook_path,
+                "base_parameters": {
+                    "instance_id": str(self.databricks_instance_id)
+                }
+            }
+        }
+
+        try:
+            # Call the API
+            response = requests.post(url, headers=headers, data=json.dumps(data))
+
+            # Print the full response for debugging purposes
+            print("Response Status Code:", response.status_code)
+            print("Response JSON:", response.json())
+
+            # Parse the response
+            response_data = response.json()
+
+            # Return response data
+            return response_data
+
+        except AttributeError as e:
+            print("API call failed due to error {e}")
+
+    def submit_jobs_in_parallel(self):
+
+        """
+        This method calls the method 'create_job_runs' and submits the jobs in parallel as per the desired number of parallel instances. It also prints the returned 'job-id' for each successful submission
+        Return: None
+        """
+
+        try:
+            # Submit jobs in parallel
+            job_responses = [self.create_jobs_run() for i in range(self.num_of_parallel_instances)]
+
+            # Print job run ids
+            for response in job_responses:
+                print(f"Job Run ID: {response.get('run_id')}")
+
+        except AttributeError as e:
+            print(f"Failed due to error : {e}")
