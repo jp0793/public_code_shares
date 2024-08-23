@@ -1,0 +1,76 @@
+import requests
+from ratelimit import limits, sleep_and_retry
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+class RateLimitedAPIClient:
+    def __init__(self, api_endpoint: str, headers: dict, rate_limit: int = 40, period: int = 1):
+        """
+        Initialize the RateLimitedAPIClient.
+        
+        :param api_endpoint: The API endpoint URL.
+        :param headers: Dictionary containing the API request headers.
+        :param rate_limit: The number of requests per period (default is 40 requests per second).
+        :param period: The time period in seconds (default is 1 second).
+        """
+        self.api_endpoint = api_endpoint
+        self.headers = headers
+        self.rate_limit = rate_limit
+        self.period = period
+
+    def __str__(self) -> str:
+        """
+        Dunder method for an end user-friendly string of the class object description
+        """
+        return f"RateLimitedAPIClient: api_endpoint: {self.api_endpoint}, headers: {self.headers}, rate_limit: {self.rate_limit}, period: {self.period}"
+    
+    def __repr__(self) -> str:
+        """
+        Dunder method for a programmer-friendly description of the class object
+        """
+        class_name = type(self).__name__
+        return f"{class_name}, api_endpoint: {self.api_endpoint}, headers: {self.headers}, rate_limit: {self.rate_limit}, period: {self.period}"
+
+    @sleep_and_retry
+    @limits(calls=40, period=1)  # Adjust rate limit here
+    def __patch_request(self, data):
+        """
+        Send a PATCH request to the API with rate limiting.
+        
+        :param data: The JSON data to be sent in the request body.
+        :return: The response object from the API request.
+        """
+        response = requests.patch(self.api_endpoint, json=data, headers=self.headers)
+        if response.status_code != 200:
+            raise Exception(f"API request failed with status code {response.status_code}")
+        return response
+
+    def upload_json_list(self, json_list) -> dict:
+        """
+        Upload a list of JSON objects to the API. The functions also returns a dictionary of all failed messages together with the errors which caused the fail.
+        
+        :param json_list: List of JSON objects (dictionaries) to be uploaded.
+        :return: a dictionary of a message (key) and error (value) for all msgs which failed to send.
+        """
+        
+        # Initiate list to store messages which failed to send
+        failed_messages_list = []
+
+        # Use ThreadPoolExecutor to send requests in parallel
+        with ThreadPoolExecutor(max_workers=self.rate_limit) as executor:
+            future_to_data = {executor.submit(self.__patch_request, data): data for data in json_list}
+            
+            for future in as_completed(future_to_data):
+                data = future_to_data[future]
+                try:
+                    response = future.result()
+                    print(f"Success: {response.status_code}")
+                except Exception as e:
+                    # Construct the dictionary in iteration
+                    failed_msg_dict = {"message": data, "error": str(e)}
+                    
+                    # Append "failed_messages" dictionary
+                    failed_messages_list.append(failed_msg_dict)
+                    
+                    print(f"The message failed to upload due to error: {e}")
+        
+        return failed_messages_list
