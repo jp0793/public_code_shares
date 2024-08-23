@@ -3,13 +3,13 @@ from ratelimit import limits, sleep_and_retry
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class RateLimitedAPIClient:
-    def __init__(self, api_endpoint: str, headers: dict, rate_limit: int = 40, period: int = 1):
+    def __init__(self, api_endpoint: str, headers: dict, rate_limit: int = 100, period: int = 1):
         """
         Initialize the RateLimitedAPIClient.
         
         :param api_endpoint: The API endpoint URL.
         :param headers: Dictionary containing the API request headers.
-        :param rate_limit: The number of requests per period (default is 40 requests per second).
+        :param rate_limit: The number of requests per period (default is 100 requests per second).
         :param period: The time period in seconds (default is 1 second).
         """
         self.api_endpoint = api_endpoint
